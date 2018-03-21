@@ -13,7 +13,7 @@
 
 # import basic packages
 import numpy as np
-import random
+import math
 # basic numpy configuration
 
 # set random seed
@@ -76,168 +76,109 @@ def propagation_and_random_search(source_patches, target_patches,
                                   global_vars=None
                                 ):
     new_f = f.copy()
+
     #############################################
     ###  PLACE YOUR CODE BETWEEN THESE LINES  ###
     #############################################
-    # loop over each pixel
     N, M = source_patches.shape[0], source_patches.shape[1]
-    best_D = np.ones((N, M)) * ((255 ** 2) * 3)
+    best_D = np.ones((N, M)) * (255 ** 2) * 3
+    # set random radius to be log_alpha {w}
+    iterations = int(math.ceil(- math.log(w, alpha)))
+    exponents = np.arange(iterations)
+    offsets = (w * (alpha ** exponents)).reshape(-1, 1)
+    # since there is no formula in numpy to directly use log base
+    # we use the exchange-base formula instead
+    random_r = int(np.ceil(-np.log10(w) / np.log10(alpha)))
     if odd_iteration:
-        x_s, x_e, y_s, y_e = 1, N-2, 1, M-2
+        x_s, x_e, y_s, y_e = 0, N, 0, M
         step = 1
     else:
-        x_s, x_e, y_s, y_e = N-2, 1, M-2, 1
+        x_s, x_e, y_s, y_e = N-1, -1, M-1, -1
         step = -1
-        # odd iteration
-        # use f(x-1, y) and f(x, y-1) as offsets
     for i in range(x_s, x_e, step):
         for j in range(y_s, y_e, step):
-            this_x, this_y = i + new_f[i, j][0], j + new_f[i, j][1]
-            D_this_loop = compute_distance(source_patches[i, j], target_patches[this_x, this_y])
-            if D_this_loop < best_D[i, j]:
-                best_D[i, j] = D_this_loop
             if not propagation_enabled:
-                # init the starting patch location
-                starts_i = np.clip(i + new_f[i, j][0], -N, N-1)
-                starts_j = np.clip(j + new_f[i, j][1], -M, M-1)
-                D_this_loop = compute_distance(source_patches[i, j],
-                                               target_patches[starts_i,
-                                            starts_j])
-                potential_1, potential_2 = new_f[i+step, j], new_f[i, j+step]
-                if potential_1[0] + i < N and potential_1[1] + j < M:
-                    target_x, target_y = np.clip(i + potential_1[0], -N, N-1),\
-                                         np.clip(j + potential_1[1], -M, M-1)
-                    D_potential_1 = compute_distance(source_patches[i, j],
-                                                target_patches[target_x, target_y])
-                    if D_potential_1 < best_D[i, j]:
-                        best_D[i, j] = D_potential_1
+                if i + new_f[i, j][0] < N and j + new_f[i, j][1] < M and i + new_f[i, j][0] >= 0 and j + new_f[i, j][1] >= 0:
+                    starts_i = np.clip(i + new_f[i, j][0], -N, N - 1)
+                    starts_j = np.clip(j + new_f[i, j][1], -M, M - 1)
+
+                    D_this_loop = compute_distance(source_patches[i, j],
+                                                   target_patches[starts_i, starts_j])
+                    if D_this_loop < best_D[i, j]:
+                        best_D[i, j] = D_this_loop
+                if 0 <= j - step < M and 0 <= i - step < N:
+                    potential_1, potential_2 = new_f[i, j-step], new_f[i-step, j]
+                else:
+                    potential_1, potential_2 = new_f[i, j], new_f[i, j]
+                if i + potential_1[0] < N and i + potential_1[0] >= 0 and j + potential_1[1] < M and j + potential_1[1] >= 0:
+                    target_x, target_y = i + potential_1[0], j + potential_1[1]
+                    target_x = np.clip(target_x, -N, N-1)
+                    target_y = np.clip(target_y, -M, M-1)
+                    D_1 = compute_distance(source_patches[i, j],
+                                           target_patches[target_x, target_y])
+                    if D_1 < best_D[i, j]:
+                        best_D[i, j] = D_1
                         new_f[i, j] = potential_1
-                else:
-                    D_potential_1 = np.nan
-                if potential_2[0] + i < N and potential_2[1] + j < M:
-                    target_x, target_y = np.clip(i + potential_2[0], -N, N-1),\
-                                         np.clip(j + potential_2[1], -M, M-1)
-                    D_potential_2 = compute_distance(source_patches[i, j],
-                                                target_patches[target_x, target_y])
-                    if D_potential_2 < best_D[i, j]:
-                        best_D[i, j] = D_potential_2
+
+                if i + potential_2[0] < N and i + potential_2[0] >= 0 and j + potential_2[1] < M and j + potential_2[1] >= 0:
+                    target_x, target_y = i + potential_2[0], j + potential_2[1]
+                    target_x = np.clip(target_x, -N, N - 1)
+                    target_y = np.clip(target_y, -M, M - 1)
+                    D_2 = compute_distance(source_patches[i, j],
+                                           target_patches[target_x, target_y])
+                    if D_2 < best_D[i, j]:
+                        best_D[i, j] = D_2
                         new_f[i, j] = potential_2
-                else:
-                    D_potential_2 = np.nan
-                # new_Ds = [D_potential_1, D_potential_2, D_this_loop]
-                # F_candidate = [potential_1, potential_2, f[i, j]]
-                # min_ = np.min(new_Ds)
-                # ind = new_Ds.index(min_)
-                # if best_D[i, j] == np.nan:
-                #     best_D[i, j] = min_
-                #     f[i, j] = F_candidate[ind]
-                #     new_f[i, j] = F_candidate[ind]
-                # if min_ < best_D[i, j]:
-                #     best_D[i, j] = min_
-                #     f[i, j] = F_candidate[ind]
-                #     new_f[i, j] = F_candidate[ind]
             if not random_enabled:
-                k = 0
-                r = w * (alpha ** k)
-                v = new_f[i, j]
-                while (r >= 1):
-                    # candidate_1 = (np.array([i, j]) + v)[0]
-                    # candidate_2 = target_patches.shape[0] - candidate_1 - 1
-                    # candidate_3 = (np.array([i, j]) + v)[1]
-                    # candidate_4 = target_patches.shape[1] - candidate_3 - 1
-                    # new_r = max(r, candidate_1, candidate_2, candidate_3, candidate_4)
-                    if r <= 0:
-                        break
-                    R = np.random.uniform(-1, 1, 1*2) * r + v
-                    random_x, random_y = np.int(i + R[0]), np.int(j + R[1])
-                    random_x = np.clip(random_x, -N, N - 1)
-                    random_y = np.clip(random_y, -M, M - 1)
-                    random_distance = compute_distance(source_patches[i, j], target_patches[random_x, random_y])
+                # # random process
+                # k = 0
+                # r = w * (alpha ** k)
+                # v = new_f[i, j]
+                # while r >= 1:
+                #     R = np.random.uniform(-1, 1, 1*2) * r + v
+                #     random_x, random_y = int(i + R[0]), int(j + R[1])
+                #     random_x = np.clip(random_x, -N, N-1)
+                #     random_y = np.clip(random_y, -M, M-1)
+                #     random_distance = compute_distance(source_patches[i, j],
+                #                                        target_patches[random_x, random_y])
+                #     if random_distance < best_D[i, j]:
+                #         best_D[i, j] = random_distance
+                #         new_f[i, j] = R
+                #     k += 1
+                #     r = w * (alpha ** k)
+
+                # if not random_enabled:
+                #     offsets = (new_f[i, j] + offsets * np.random.uniform(-1, 1, (iterations, 2))).astype(int)
+                #     candidates = np.clip(offsets + np.array([i, j]), np.array([0, 0]), np.array([N - 1, M - 1]))
+                #     candidates = candidates - np.array([i, j])
+                #     candidate_patches = target_patches[candidates[:, 0], candidates[:, 1]]
+                #     candidate_patches = candidate_patches.reshape((-1, source_patches.shape[2], source_patches.shape[3]))
+                #     candidate_patches = candidate_patches - source_patches[i, j]
+                #     candidate_patches[np.isnan(candidate_patches)] = 0
+                #     # candidate_patches = np.where(np.isnan(candidate_patches), 0, candidate_patches)
+                #     candidate_D = np.absolute(candidate_patches).sum(-1).sum(-1)
+                #     new_min, index_min = np.min(candidate_D), np.argmin(candidate_D)
+                #     if best_D[i, j] > new_min:
+                #         best_D[i, j] = new_min
+                #         new_f[i, j] = candidates[index_min]
+                for t in range(random_r):
+                    R = np.random.uniform(-1, 1, 1*2)
+                    # set u = wa^tR + v, where v is new_f[i, j]
+                    u = new_f[i, j] + np.multiply(w * (alpha ** t), R)
+                    random_x = int(np.clip(i + u[0], -N, N-1))
+                    random_y = int(np.clip(j + u[1], -M, M-1))
+                    random_distance = compute_distance(source_patches[i, j],
+                                                       target_patches[random_x, random_y])
                     if random_distance < best_D[i, j]:
                         best_D[i, j] = random_distance
-                        new_f[i, j] = R
-                        f[i, j] = R
-                    k += 1
-                    r = w * (alpha ** k)
-    # else:
-    #     # even iteration
-    #     for i in range(N-1, 1, -1):
-    #         for j in range(M-1, 1, -1):
-    #             D_this_loop = None
-    #             if not propagation_enabled:
-    #                 # init the starting patch location
-    #                 starts_i = np.clip(i + new_f[i, j, 0], -N, N-1)
-    #                 starts_j = np.clip(j + new_f[i, j, 1], -M, M-1)
-    #                 D_this_loop = compute_distance(source_patches[i, j],
-    #                                                target_patches[starts_i,
-    #                                             starts_j])
-    #                 potential_1, potential_2 = new_f[i-1, j], new_f[i, j-1]
-    #                 if potential_1[0] + i < N and potential_1[1] + j < M:
-    #                     target_x, target_y = np.clip(i + potential_1[0], -N, N-1),\
-    #                                          np.clip(j + potential_1[1], -M, M-1)
-    #                     D_potential_1 = compute_distance(source_patches[i, j],
-    #                                                 target_patches[target_x, target_y])
-    #                     if D_potential_1 < best_D[i, j]:
-    #                         best_D[i, j] = D_potential_1
-    #                         new_f[i, j] = potential_1
-    #                 else:
-    #                     D_potential_1 = np.nan
-    #                 if potential_2[0] + i < N and potential_2[1] + j < M:
-    #                     target_x, target_y = np.clip(i + potential_2[0], -N, N-1),\
-    #                                          np.clip(j + potential_2[1], -M, M-1)
-    #                     D_potential_2 = compute_distance(source_patches[i, j],
-    #                                                 target_patches[target_x, target_y])
-    #                     # if D_potential_2 < best_D[i, j]:
-    #                     #     best_D[i, j] = D_potential_2
-    #                     #     new_f[i, j] = potential_2
-    #                 else:
-    #                     D_potential_2 = np.nan
-    #                 new_Ds = [D_potential_1, D_potential_2, D_this_loop]
-    #                 F_candidate = [potential_1, potential_2, new_f[i, j]]
-    #                 print(new_Ds)
-    #                 min_ = np.min(new_Ds)
-    #                 ind = new_Ds.index(min_)
-    #                 if best_D[i, j] == np.nan:
-    #                     best_D[i, j] = min_
-    #                     f[i, j] = F_candidate[ind]
-    #                     new_f[i, j] = F_candidate[ind]
-    #                 if min_ < best_D[i, j]:
-    #                     best_D[i, j] = min_
-    #                     f[i, j] = F_candidate[ind]
-    #                     new_f[i, j] = F_candidate[ind]
-    #             # random search
-    #             if not random_enabled:
-    #                 k = 0
-    #                 r = w * (alpha ** k)
-    #                 v = new_f[i, j]
-    #                 while (r >= 1):
-    #                     candidate_1 = (np.array([i, j]) + v)[0]
-    #                     candidate_2 = target_patches.shape[0] - candidate_1 - 1
-    #                     candidate_3 = (np.array([i, j]) + v)[1]
-    #                     candidate_4 = target_patches.shape[1] - candidate_3 - 1
-    #                     new_r = max(r, candidate_1, candidate_2, candidate_3, candidate_4)
-    #                     if new_r <= 0:
-    #                         break
-    #                     R = np.random.uniform(-1, 1, 1*2) * new_r + v
-    #                     random_x, random_y = np.int(i + R[0]), np.int(j + R[1])
-    #                     random_x = np.clip(random_x, -N, N - 1)
-    #                     random_y = np.clip(random_y, -M, M - 1)
-    #                     random_distance = compute_distance(source_patches[i, j], target_patches[random_x, random_y])
-    #                     if random_distance < best_D[i, j]:
-    #                         best_D[i, j] = random_distance
-    #                         new_f[i, j] = R
-    #                         f[i, j] = R
-    #                     k += 1
-    #                     r = w * (alpha ** k)
+                        new_f[i, j] = u
+
+
 
     #############################################
+
     return new_f, best_D, global_vars
 
-
-# helper function for computing D
-def compute_distance(a, b):
-    distance = np.abs(a.flatten() - b.flatten())
-    return np.sum(distance)
 
 # This function uses a computed NNF to reconstruct the source image
 # using pixels from the target image. The function takes two input
@@ -266,9 +207,10 @@ def reconstruct_source_from_target(target, f):
     #############################################
     ###  PLACE YOUR CODE BETWEEN THESE LINES  ###
     #############################################
-    cord_matrix = make_coordinates_matrix(target.shape) + f
-    rec_source = target[cord_matrix[:, :, 0], cord_matrix[:, :, 1]]
-
+    cord = make_coordinates_matrix(target.shape) + f
+    shape_0 = np.clip(cord[:,:,0], -target.shape[0], target.shape[0]-1)
+    shape_1 = np.clip(cord[:,:,1], -target.shape[1], target.shape[1]-1)
+    rec_source = target[shape_0, shape_1]
     #############################################
 
     return rec_source
@@ -281,6 +223,16 @@ def reconstruct_source_from_target(target, f):
 # You should study this function very carefully to understand precisely
 # how pixel data are organized, and how patches that extend beyond
 # the image border are handled.
+
+
+# helper function to compute D
+def compute_distance(source, target):
+    aa = source.flatten()
+    bb = target.flatten()
+    raw = np.abs(aa - bb)
+    one_norm_distance = np.sum(np.where(np.isnan(raw), 0, raw))
+    return one_norm_distance
+
 
 
 def make_patch_matrix(im, patch_size):
