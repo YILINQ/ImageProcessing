@@ -251,45 +251,45 @@ def nlm(target, f_heap, h):
     #############################################
     ###  PLACE YOUR CODE BET
     # WEEN THESE LINES  ###
-    denoised = np.zeros(target.shape, np.int32)
-    N, M, K = target.shape[0], target.shape[1], len(f_heap[0][0])
-    h_2 = h*h
-    for i in range(N):
-        for j in range(M):
-            W = [] #  weight
-            Z = 0  #  Z
-            NL = np.zeros([1, 3])
-            for k in range(K):
-                vector_distance = -f_heap[i][j][k][0]  #  negative distance
-                exp_d = np.exp(-(vector_distance / h_2))
-                Z += exp_d
-                W.append(exp_d)
-            for t in range(len(W)):
-                target_x, target_y = i + f_heap[i][j][k][2][0], j + f_heap[i][j][k][2][1]
-                NL += W[t] * target[target_x, target_y]
-            denoised[i, j] = NL / Z
+    #denoised = np.zeros(target.shape, np.int32)
+    #N, M, K = target.shape[0], target.shape[1], len(f_heap[0][0])
+    #h_2 = h*h
+    #for i in range(N):
+    #    for j in range(M):
+    #        W = [] #  weight
+    #        Z = 0  #  Z
+    #        NL = np.zeros([1, 3])
+    #        for k in range(K):
+    #            vector_distance = -f_heap[i][j][k][0]  #  negative distance
+    #            exp_d = np.exp(-(vector_distance / h_2))
+    #            Z += exp_d
+    #            W.append(exp_d)
+    #        for t in range(len(W)):
+    #            target_x, target_y = i + f_heap[i][j][k][2][0], j + f_heap[i][j][k][2][1]
+    #            NL += W[t] * target[target_x, target_y]
+    #        denoised[i, j] = NL / Z
 
-        # N = target.shape[0]
-        # M = target.shape[1]
-        # K = len(f_heap[0][0])
-        # g = make_coordinates_matrix(target.shape)
-        # f_k, D_k = NNF_heap_to_NNF_matrix(f_heap)
-        # tlocation = (g + f_k).reshape((-1, 2))
-        # kim = target[tlocation[:, 0], tlocation[:, 1]].reshape((-1, N, M, 3))
-        # epower = np.exp(-(D_k ** .5 / h ** 2))
-        # Z = np.sum(epower, axis=0)
-        # w = epower / Z
-        # denoised = np.zeros(target.shape)
-        # for n in range(N):
-        #     for m in range(M):
-        #         for k in range(K):
-        #             denoised[n, m] += kim[k, n, m] * w[k, n, m]
+    N = target.shape[0]
+    M = target.shape[1]
+    K = len(f_heap[0][0])
+    g = make_coordinates_matrix(target.shape)
+    f_k, D_k = NNF_heap_to_NNF_matrix(f_heap)
+    tlocation = (g + f_k).reshape((-1, 2))
+    kim = target[tlocation[:, 0], tlocation[:, 1]].reshape((-1, N, M, 3))
+    epower = np.exp(-(D_k ** .5 / h ** 2))
+    Z = np.sum(epower, axis=0)
+    w = epower / Z
+    denoised = np.zeros(target.shape)
+    for n in range(N):
+        for m in range(M):
+            for k in range(K):
+	        denoised[n, m] += kim[k, n, m] * w[k, n, m]
 #############################################
 
 
     #############################################
 
-    return target
+    return denoised
 
 
 
