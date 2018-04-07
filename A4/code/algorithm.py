@@ -111,7 +111,7 @@ def propagation_and_random_search_k(source_patches, target_patches,
                     if i + f_heap[i][j][k][2][0] < N and j + f_heap[i][j][k][2][1] < M and i + f_heap[i][j][k][2][0] >= 0 and j + f_heap[i][j][k][2][1] >= 0:
                         starts_i, starts_j = i + f_heap[i][j][k][2][0], j + f_heap[i][j][k][2][1]
                         if (starts_j - i, starts_j - j) not in dict_set:
-                            D_this_loop = -compute_distance(source_patches[i, j], target_patches[starts_i, starts_j])
+                            D_this_loop = -compute_2_norm(source_patches[i, j], target_patches[starts_i, starts_j])
                             if D_this_loop > f_heap[i][j][0][0]:
                                 heappushpop(f_heap[i][j], (D_this_loop, next(_tiebreaker), (f_heap[i][j][k][2])))
                     if 0 <= i - step < N and 0 <= i + f_heap[i - step][j][k][2][0] < N:
@@ -119,7 +119,7 @@ def propagation_and_random_search_k(source_patches, target_patches,
                         target_y = j + f_heap[i - step][j][k][2][1]
                         if (target_x - i, target_y - j) not in dict_set:
                             dict_set[(target_x - i, target_y - j)] = 320
-                            D_1 = -compute_distance(source_patches[i, j], target_patches[target_x, target_y])
+                            D_1 = -compute_2_norm(source_patches[i, j], target_patches[target_x, target_y])
                             if D_1 > f_heap[i][j][0][0]:
                                 heappushpop(f_heap[i][j], (D_1, next(_tiebreaker), f_heap[i-step][j][k][2]))
 
@@ -128,7 +128,7 @@ def propagation_and_random_search_k(source_patches, target_patches,
                         target_y = j + f_heap[i][j - step][k][2][1]
                         if (target_x - i, target_y - j) not in dict_set:
                             dict_set[(target_x - i, target_y - j)] = 320
-                            D_2 = -compute_distance(source_patches[i, j], target_patches[target_x, target_y])
+                            D_2 = -compute_2_norm(source_patches[i, j], target_patches[target_x, target_y])
                             if D_2 > f_heap[i][j][0][0]:
                                 heappushpop(f_heap[i][j], (D_2, next(_tiebreaker), f_heap[i][j - step][k][2]))
                 if random_enabled:
@@ -139,7 +139,7 @@ def propagation_and_random_search_k(source_patches, target_patches,
                             random_x, random_y = int(i + u[0]), int(j + u[1])
                             if (random_x-i, random_y-j) not in dict_set:
                                 dict_set[(random_x - i, random_y - j)] = 320
-                                random_distance = -compute_distance(source_patches[i, j],
+                                random_distance = -compute_2_norm(source_patches[i, j],
                                                                target_patches[random_x, random_y])
                                 if random_distance < f_heap[i][j][0][0]:
                                     heappushpop(f_heap[i][j], (random_distance, next(_tiebreaker), f_heap[random_x][random_y][k][2]))
@@ -199,18 +199,14 @@ def NNF_matrix_to_NNF_heap(source_patches, target_patches, f_k):
     f_coord_dictionary = [[0 for j in range(M)] for i in range(N)]
     for i in range(N):
         for j in range(M):
-            small_heap = []
-            d = {}
+            small_heap, d = [], {}
             for k in range(K):
-                target_x = i + f_k[k, i, j, 0]
-                target_y = j + f_k[k, i, j, 1]
                 displacement = f_k[k, i, j]
                 # add a negative sign to turn the min_heap into max_heap
-                distance = - compute_distance(source_patches[i, j], target_patches[i+displacement[0], j+displacement[1]])
+                distance = - compute_2_norm(source_patches[i, j], target_patches[i+displacement[0], j+displacement[1]])
                 heappush(small_heap, (distance, next(_tiebreaker), displacement))
                 d[(displacement[0], displacement[1])] = 320
-            f_coord_dictionary[i][j] = d
-            f_heap[i][j] = small_heap
+            f_coord_dictionary[i][j], f_heap[i][j] = d, small_heap
     #############################################
 
     return f_heap, f_coord_dictionary
@@ -238,15 +234,12 @@ def NNF_heap_to_NNF_matrix(f_heap):
     #############################################
     new = copy(f_heap)
     N, M, K = len(f_heap),len(f_heap[0]), len(f_heap[0][0])
-    f_k = np.zeros([K, N, M, 2], np.int32)
-    D_k = np.zeros([K, N, M])
+    f_k, D_k = np.zeros([K, N, M, 2], np.int32), np.zeros([K, N, M])
     for i in range(N):
         for j in range(M):
-            temp = nlargest(len(new[0][0]), new[i][j]) # heap corresponding to f_heap[i][j]
+            temp = nlargest(len(new[0][0]), new[i][j])  # heap corresponding to f_heap[i][j]
             for k in range(K):
-
                 f_k[k, i, j] = temp[k][2]
-
                 D_k[k, i, j] = -temp[k][0]
     #############################################
 
@@ -254,20 +247,49 @@ def NNF_heap_to_NNF_matrix(f_heap):
 
 
 def nlm(target, f_heap, h):
-
-
     # this is a dummy statement to return the image given as input
-    denoised = target
-
     #############################################
     ###  PLACE YOUR CODE BET
     # WEEN THESE LINES  ###
-    #############################################
+    denoised = np.zeros(target.shape, np.int32)
+    N, M, K = target.shape[0], target.shape[1], len(f_heap[0][0])
+    h_2 = h*h
+    for i in range(N):
+        for j in range(M):
+            W = [] #  weight
+            Z = 0  #  Z
+            NL = np.zeros([1, 3])
+            for k in range(K):
+                vector_distance = -f_heap[i][j][k][0]  #  negative distance
+                exp_d = np.exp(-(vector_distance / h_2))
+                Z += exp_d
+                W.append(exp_d)
+            for t in range(len(W)):
+                target_x, target_y = i + f_heap[i][j][k][2][0], j + f_heap[i][j][k][2][1]
+                NL += W[t] * target[target_x, target_y]
+            denoised[i, j] = NL / Z
+
+        # N = target.shape[0]
+        # M = target.shape[1]
+        # K = len(f_heap[0][0])
+        # g = make_coordinates_matrix(target.shape)
+        # f_k, D_k = NNF_heap_to_NNF_matrix(f_heap)
+        # tlocation = (g + f_k).reshape((-1, 2))
+        # kim = target[tlocation[:, 0], tlocation[:, 1]].reshape((-1, N, M, 3))
+        # epower = np.exp(-(D_k ** .5 / h ** 2))
+        # Z = np.sum(epower, axis=0)
+        # w = epower / Z
+        # denoised = np.zeros(target.shape)
+        # for n in range(N):
+        #     for m in range(M):
+        #         for k in range(K):
+        #             denoised[n, m] += kim[k, n, m] * w[k, n, m]
+#############################################
 
 
     #############################################
 
-    return denoised
+    return target
 
 
 
@@ -285,11 +307,12 @@ def compute_distance(source, target):
     one_norm_distance = np.sum(np.where(np.isnan(raw), 0, raw))
     return one_norm_distance
 
-def heapsort(iterable):
-    h = []
-    for value in iterable:
-        heappush(h, value)
-    return [heappop(h) for i in range(len(h))]
+def compute_2_norm(source, target):
+    aa = source.flatten()
+    bb = target.flatten()
+    raw = np.abs(aa - bb)
+    distance = np.sum(np.where(np.isnan(raw), 0, raw*raw))
+    return distance**0.5
 #############################################
 
 

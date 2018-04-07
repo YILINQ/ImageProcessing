@@ -1,4 +1,4 @@
-wolf> python viscomp.py --nlm --nlm_h 25 --k 4 --partial-results --rec-source --nnf-image --nnf-vectors --nnf-line-color r --iters 3 --patch-size 7 --alpha 0.5 --source ../test_images/jaguar2/source_noise2.png --target ../test_images/jaguar2/source_noise2.png --output ../results/jaguar2/jaguar2
+wolf> python viscomp.py --nlm --nlm_h 25 --k 4 --partial-results --rec-source --nnf-image --nnf-vectors --nnf-line-color r --iters 3 --patch-size 7 --alpha 0.5 --source ../test_images/jaguar2/source.png --target ../test_images/jaguar2/source_noise2.png --output ../results/jaguar2/jaguar2
 -----------------------------------------------------------------
 PatchMatch parameters:
         Initial NNF:            Generated internally
@@ -13,7 +13,7 @@ PatchMatch parameters:
         Random search enabled:  True
 Output path and base filename:  ../results/jaguar2/jaguar2
 Visualization parameters:
-        Output files:           correspondences, color nnf, rec'd source 
+        Output files:           correspondences, color nnf, rec'd source
         NNF subsampling:        100
         NNF line width:         0.5
         NNF line color:         r
